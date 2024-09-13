@@ -131,7 +131,7 @@ func InitUnits() error {
 	}
 	energyStatusUnits = make([]float64, numPackages)
 	for i := 0; i < numPackages; i++ {
-		result, err := ReadMSR(i, msrRaplPowerUnit)
+		result, err := ReadMSR(i, msrRaplPowerUnit) // 读取 RAPL MSR 值（RAPL（Running Average Power Limit）MSR（Model-Specific Register）是一种用于监控和管理处理器功耗的技术，主要用于 Intel 处理器。它允许操作系统和应用程序动态管理 CPU 的功耗，以优化性能和能效。）
 		if err != nil {
 			klog.V(1).Info(err)
 			return fmt.Errorf("failed to read power unit: %v", err)

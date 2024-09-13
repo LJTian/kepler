@@ -49,6 +49,7 @@ var (
 
 func InitPowerImpl() {
 	sysfsImpl := &source.PowerSysfs{}
+	// 判断是否支持系统收集，判断依据（/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj 文件是否存在）
 	if sysfsImpl.IsSystemCollectionSupported() /*&& false*/ {
 		klog.V(1).Infoln("use sysfs to obtain power")
 		powerImpl = sysfsImpl
@@ -56,6 +57,7 @@ func InitPowerImpl() {
 	}
 
 	msrImpl := &source.PowerMSR{}
+	// 通过 读取 CPU RAPL 集群器，判断是否支持，判断依据（/dev/cpu/0/msr 内的 RAPL 值）
 	if msrImpl.IsSystemCollectionSupported() && config.EnabledMSR {
 		klog.V(1).Infoln("use MSR to obtain power")
 		powerImpl = msrImpl
@@ -63,12 +65,14 @@ func InitPowerImpl() {
 	}
 
 	apmXgeneSysfsImpl := &source.ApmXgeneSysfs{}
+	// arm 机器 ，判断依据（/sys/class/hwmon/hwmon*/power*_label）
 	if apmXgeneSysfsImpl.IsSystemCollectionSupported() {
 		klog.V(1).Infoln("use Ampere Xgene sysfs to obtain power")
 		powerImpl = apmXgeneSysfsImpl
 		return
 	}
 
+	// 无法获取功率，使用估算方法（保底）
 	klog.V(1).Infoln("Unable to obtain power, use estimate method")
 	estimateImpl := &source.PowerEstimate{}
 	powerImpl = estimateImpl

@@ -101,7 +101,7 @@ func main() {
 
 	config.LogConfigs() // 日志打印配置
 
-	components.InitPowerImpl() // 初始化 电源管理模板 ( inter rapl 文件系统对应路径：/sys/class/powercap/intel-rapl/)
+	components.InitPowerImpl() // 初始化 电源管理模板（选择合适的管理模块，如果没有找到合适的，将采用估算方式）
 	platform.InitPowerImpl()   // 设置电源管理模块，判断是否是 IBM 的 Z 系列架构，使用 PowerHMC 管理模块
 
 	bpfExporter, err := bpf.NewExporter() // 创建一个 ebpf 导出器

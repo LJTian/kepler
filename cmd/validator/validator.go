@@ -180,12 +180,12 @@ func isFileExists(path string) bool {
 }
 
 func main() {
-	// init stuffs
+	// init stuffs（初始化内容）
 	flag.Parse()
 	fmt.Println("Dump flag parameters value...")
 	fmt.Printf("gen-env:%t\ngen-power:%t\nsampleCount:%d\nsampleDuration:%d\n",
 		*genEnv, *genPower, *sampleCount, *sampleDuration)
-	cpu, err := ghw.CPU()
+	cpu, err := ghw.CPU() // 获取 CPU 信息
 	if err != nil {
 		fmt.Printf("get cpu info error: %s\n", err)
 		return
@@ -201,6 +201,7 @@ func main() {
 
 	platform.InitPowerImpl()
 
+	// 创建 power.csv 文件
 	csvFilePath := filepath.Join(resultDirPath, "power.csv")
 	if !isFileExists(csvFilePath) {
 		columnHeaders := []string{"Pkg", "Core", "Uncore", "Dram"}
@@ -219,7 +220,7 @@ func main() {
 	}
 
 	if *genEnv {
-		//TODO: Currently only support X86 BareMetal platform validation
+		//TODO: Currently only support X86 BareMetal platform validation（目前仅支持 X86 BareMetal 平台验证）BareMetal：指的是没有任何虚拟化层或操作系统的物理计算机硬件。在这种环境中，软件直接运行在硬件上，而不是通过虚拟机或容器。
 		cpuArch, err := getX86Architecture()
 		if err != nil {
 			fmt.Printf("getX86Architecture failed\n")
