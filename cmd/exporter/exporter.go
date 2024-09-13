@@ -84,34 +84,35 @@ func main() {
 
 	klog.Infof("Kepler running on version: %s", kversion.Version)
 
-	config.SetEnabledEBPFCgroupID(*enabledEBPFCgroupID)
-	config.SetEnabledHardwareCounterMetrics(*exposeHardwareCounterMetrics)
-	config.SetEnabledGPU(*enableGPU)
-	config.SetEnabledQAT(*enableQAT)
+	config.SetEnabledEBPFCgroupID(*enabledEBPFCgroupID)                    // 设置 Cgroup ID, 内核版本大于 4.18。且为 cgroup v2 版则收集 Cgroup id
+	config.SetEnabledHardwareCounterMetrics(*exposeHardwareCounterMetrics) // 设置 硬件计数指标
+	config.SetEnabledGPU(*enableGPU)                                       // 设置 GPU
+	config.SetEnabledQAT(*enableQAT)                                       // 设置 QAT
 	config.EnabledMSR = *enabledMSR
-	config.SetEnabledIdlePower(*exposeEstimatedIdlePower || components.IsSystemCollectionSupported())
+	config.SetEnabledIdlePower(*exposeEstimatedIdlePower || components.IsSystemCollectionSupported()) // 设置 空闲功率是否开启
 
-	config.SetKubeConfig(*kubeconfig)
-	config.SetEnableAPIServer(*apiserverEnabled)
+	config.SetKubeConfig(*kubeconfig)            // 设置 k8s kubeconfig 配置文件路径，默认为集群内的配置文件
+	config.SetEnableAPIServer(*apiserverEnabled) // 是否从 APIServer 收集 pod 信息，禁用则从 kubelet 进行收集
 
-	// set redfish credential file path
+	// set redfish credential file path          // 设置 redfish (经过搜索，这应该是一种行业政策。)
 	if *redfishCredFilePath != "" {
 		config.SetRedfishCredFilePath(*redfishCredFilePath)
 	}
 
-	config.LogConfigs()
+	config.LogConfigs() // 日志打印配置
 
-	components.InitPowerImpl()
-	platform.InitPowerImpl()
+	components.InitPowerImpl() // 初始化 电源管理模板 ( inter rapl 文件系统对应路径：/sys/class/powercap/intel-rapl/)
+	platform.InitPowerImpl()   // 设置电源管理模块，判断是否是 IBM 的 Z 系列架构，使用 PowerHMC 管理模块
 
-	bpfExporter, err := bpf.NewExporter()
+	bpfExporter, err := bpf.NewExporter() // 创建一个 ebpf 导出器
 	if err != nil {
 		klog.Fatalf("failed to create eBPF exporter: %v", err)
 	}
 	defer bpfExporter.Detach()
 
-	stats.InitAvailableParamAndMetrics(bpfExporter.GetEnabledBPFHWCounters(), bpfExporter.GetEnabledBPFSWCounters())
+	stats.InitAvailableParamAndMetrics(bpfExporter.GetEnabledBPFHWCounters(), bpfExporter.GetEnabledBPFSWCounters()) // 初始化可用参数和指标（参数1：硬件计数器，参数2：软件参数器）
 
+	// 判断是否启用 GPU
 	if config.EnabledGPU {
 		klog.Infof("Initializing the GPU collector")
 		// the GPU operators typically takes longer time to initialize than kepler resulting in error to start the gpu driver
@@ -131,6 +132,7 @@ func main() {
 		}
 	}
 
+	// 判断是否公开 QAT 指标
 	if config.IsExposeQATMetricsEnabled() {
 		klog.Infof("Initializing the QAT collector")
 		if qatErr := qat.Init(); qatErr == nil {
@@ -140,17 +142,17 @@ func main() {
 		}
 	}
 
-	m := manager.New(bpfExporter)
-	reg := m.PrometheusCollector.RegisterMetrics()
+	m := manager.New(bpfExporter)                  // 初始化一个收集管理器
+	reg := m.PrometheusCollector.RegisterMetrics() // 注册 普罗米修斯指标，包含进程、容器、虚拟机、节点
 	defer components.StopPower()
 
-	// starting a new gorotine to collect data and report metrics
-	// BPF is attached here
+	// starting a new gorotine to collect data and report metrics (启动新的 协程 来收集数据和报告指标)
+	// BPF is attached here（ BPF 附加在此处 ）
 	if startErr := m.Start(); startErr != nil {
 		klog.Infof("%s", fmt.Sprintf("failed to start : %v", startErr))
 	}
-	metricPathConfig := config.GetMetricPath(*metricsPath)
-	bindAddressConfig := config.GetBindAddress(*address)
+	metricPathConfig := config.GetMetricPath(*metricsPath) // 获取 指标路径，用于拼接 普罗米修斯
+	bindAddressConfig := config.GetBindAddress(*address)   // 获取 绑定地址,用于监听
 
 	http.Handle(metricPathConfig, promhttp.HandlerFor(
 		reg,
@@ -158,7 +160,7 @@ func main() {
 			Registry: reg,
 		},
 	))
-	http.HandleFunc("/healthz", healthProbe)
+	http.HandleFunc("/healthz", healthProbe) // 健康探针
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, httpErr := w.Write([]byte(`<html>
                         <head><title>Energy Stats Exporter</title></head>
@@ -172,14 +174,14 @@ func main() {
 		}
 	})
 
-	klog.Infof("starting to listen on %s", bindAddressConfig)
+	klog.Infof("starting to listen on %s", bindAddressConfig) // 开始监听
 	ch := make(chan error)
 	go func() {
 		ch <- http.ListenAndServe(bindAddressConfig, nil)
 	}()
 
-	klog.Infof(startedMsg, time.Since(start))
-	klog.Flush() // force flush to parse the start msg in the e2e test
+	klog.Infof(startedMsg, time.Since(start)) // 日志输出启动时间
+	klog.Flush()                              // force flush to parse the start msg in the e2e test
 	err = <-ch
-	klog.Fatalf("%s", fmt.Sprintf("failed to bind on %s: %v", bindAddressConfig, err))
+	klog.Fatalf("%s", fmt.Sprintf("failed to bind on %s: %v", bindAddressConfig, err)) // 收到通知退出
 }
